@@ -12,16 +12,20 @@ class DiscordClient(discord.Client):
         self.target_channel = None
 
     async def on_ready(self):
+        self.find_channel.start()
+
+    @tasks.loop(hours=1)
+    async def find_channel(self):
         self.target_channel = self.get_channel(int(os.environ["TARGET_CHANNEL_A9"]))
         if self.target_channel is not None:
             print("Target found!")
             self.send_message.start()
             print("Messaging started!")
+            self.find_channel.stop()
         else:
             print("Target not found!")
-            await self.close()
 
-    @tasks.loop(hours=6)
+    @tasks.loop(hours=12)
     async def send_message(self):
         await self.target_channel.send(
             """Our team is ÆR™ (All Elite Racers) and we are a friendly, highly motivated group on Android looking \
