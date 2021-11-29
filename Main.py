@@ -1,12 +1,15 @@
-import os
-import random
 from glob import glob
+from os import environ
+from random import choice
+from sys import stderr
 
-import discord
-from discord.ext import tasks
+from discord.client import Client
+from discord.errors import Forbidden, HTTPException
+from discord.ext.tasks import loop
+from discord.file import File
 
 
-class DiscordClient(discord.Client):
+class DiscordClient(Client):
     def __init__(self):
         super().__init__()
         self.target_channel = None
@@ -14,21 +17,22 @@ class DiscordClient(discord.Client):
     async def on_ready(self):
         self.find_channel.start()
 
-    @tasks.loop(hours=1)
+    @loop(hours=6)
     async def find_channel(self):
-        self.target_channel = self.get_channel(int(os.environ["TARGET_CHANNEL_A9"]))
+        self.target_channel = self.get_channel(int(environ["TARGET_CHANNEL_A9"]))
         if self.target_channel is not None:
             print("Target found!")
             self.send_message.start()
             print("Messaging started!")
             self.find_channel.stop()
         else:
-            print("Target not found!")
+            print("Target not found!", file=stderr)
 
-    @tasks.loop(hours=12)
+    @loop(hours=12)
     async def send_message(self):
-        await self.target_channel.send(
-            """Our team is ÆR™ (All Elite Racers) and we are a friendly, highly motivated group on Android looking \
+        try:
+            await self.target_channel.send(
+                """Our team is ÆR™ (All Elite Racers) and we are a friendly, highly motivated group on Android looking \
 for some new active members! 
 
 Team 1 - ÆR™ (4K /Day)
@@ -44,11 +48,20 @@ We're currently looking for active players to fill ALL TEAMS, if you're interest
 you can hit us up and join our discord server below! 
 
 Join us on discord - https://discord.gg/hwdC7YZ""",
-            file=discord.File(random.choice(glob("images/*.jpg"))),
-        )
-        print("Message sent!")
+                file=File(choice(glob("images/*.jpg"))),
+            )
+            print("Message sent!")
+        except Forbidden as f:
+            print(
+                "You do not have the proper permissions to send the message.",
+                f,
+                sep="\n",
+                file=stderr,
+            )
+        except HTTPException as h:
+            print("Sending the message failed.", h, sep="\n", file=stderr)
 
 
 if __name__ == "__main__":
     dc = DiscordClient()
-    dc.run(os.environ["DISCORD_TOKEN_BOT"], bot=False)
+    dc.run(environ["DISCORD_TOKEN"], bot=False)
