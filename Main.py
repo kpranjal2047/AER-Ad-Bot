@@ -8,18 +8,44 @@ from discord.errors import Forbidden, HTTPException
 from discord.ext.tasks import loop
 from discord.file import File
 
+account = environ["DISCORD_TOKEN"]
+a9_channel = int(environ["TARGET_CHANNEL_A9"])
+looptime = int(environ["LOOP_HOUR"])
+teams = set(environ["TEAMS"])
+
+
+def create_message():
+    with open("text/message.txt", "r", encoding="utf8") as fp:
+        message = fp.read()
+    if all(str(x) in teams for x in range(1, 6)):
+        message = message.format("ALL TEAMS")
+        return message
+    num = len(teams)
+    added = 0
+    for i in range(1, 6):
+        if str(i) in teams:
+            if added == 0:
+                message = message.format("Team " + str(i) + "{}")
+            elif added == num - 1:
+                message = message.format(" and " + str(i) + "{}")
+            else:
+                message = message.format(", " + str(i) + "{}")
+            added += 1
+    return message.format("")
+
 
 class DiscordClient(Client):
     def __init__(self):
         super().__init__()
         self.target_channel = None
+        self.message = create_message()
 
     async def on_ready(self):
         self.find_channel.start()
 
-    @loop(hours=6)
+    @loop(hours=looptime / 2)
     async def find_channel(self):
-        self.target_channel = self.get_channel(int(environ["TARGET_CHANNEL_A9"]))
+        self.target_channel = self.get_channel(a9_channel)
         if self.target_channel is not None:
             print("Target found!")
             self.send_message.start()
@@ -28,27 +54,11 @@ class DiscordClient(Client):
         else:
             print("Target not found!", file=stderr)
 
-    @loop(hours=12)
+    @loop(hours=looptime)
     async def send_message(self):
         try:
             await self.target_channel.send(
-                """Our team is ÆR™ (All Elite Racers) and we are a friendly, highly motivated group on Android looking \
-for some new active members! 
-
-Team 1 - ÆR™ (4K /Day)
-Team 2 - ÆR™ Wolves (2.5K /Day)
-Team 3 - ÆR™ Demons (1K /Day)
-Team 4 - ÆR™ Hailstorm (500 /Day)
-
-• We have jokes, share tips for races and find insider info to make sure we all get as many rewards as possible.
-• We have club tournaments where all the club members can participate.
-• We have photo competitions where we get stunning pics and top three goes in ÆR™ club banner
-
-We're currently looking for active players to fill ALL TEAMS, if you're interested and can meet the requirements, \
-you can hit us up and join our discord server below! 
-
-Join us on discord - https://discord.gg/hwdC7YZ""",
-                file=File(choice(glob("images/*.jpg"))),
+                self.message, file=File(choice(glob("images/*.jpg")))
             )
             print("Message sent!")
         except Forbidden as f:
@@ -64,4 +74,4 @@ Join us on discord - https://discord.gg/hwdC7YZ""",
 
 if __name__ == "__main__":
     dc = DiscordClient()
-    dc.run(environ["DISCORD_TOKEN"], bot=False)
+    dc.run(account, bot=False)
